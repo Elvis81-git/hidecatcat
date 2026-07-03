@@ -648,6 +648,9 @@ socket.on('shotMissed', ({ x, y, bullets }) => {
 socket.on('gameOver', ({ winner, players }) => showResult(winner, players));
 
 socket.on('returnToLobby', ({ players }) => {
+  State.myRole = null;
+  togglePanMode(false);
+  $('btn-pan-mode').textContent = '🖐️';
   renderPlayerList(players);
   $('btn-ready').classList.remove('btn--ready-active');
   $('ready-icon').textContent = '⚡';
@@ -778,7 +781,14 @@ function updateZoomLabel() {
 function togglePanMode(force) {
   State.panMode = force !== undefined ? force : !State.panMode;
   $('btn-pan-mode').classList.toggle('zoom-btn--active', State.panMode);
-  $('canvas-viewport').style.cursor = State.panMode ? 'grab' : 'default';
+  
+  if (State.myRole === 'seeker') {
+    $('btn-pan-mode').textContent = State.panMode ? '🔫' : '🖐️';
+  } else {
+    $('btn-pan-mode').textContent = '🖐️';
+  }
+  
+  $('canvas-viewport').style.cursor = State.panMode ? 'grab' : (State.myRole === 'seeker' ? 'crosshair' : 'default');
 }
 $('btn-pan-mode').addEventListener('click', () => togglePanMode());
 
@@ -1160,6 +1170,7 @@ function enterSeekerPhase(hiders, bullets) {
   if (State.myRole === 'seeker') {
     $('hud-phase-info').textContent = '點擊地圖找出躲藏者！';
     $('seeker-hint').style.display  = 'flex';
+    $('canvas-viewport').style.cursor = 'crosshair';
     bindSeekerClick();
   } else {
     $('hud-phase-info').textContent = '祈禱別被找到 🙏';
@@ -1187,6 +1198,7 @@ function bindSeekerClick() {
   let pointerDownTime = 0;
 
   function shoot(clientX, clientY) {
+    if (State.panMode) return; // 拖曳模式下禁止開槍
     if (State.bullets <= 0) { showToast('子彈耗盡！', 'error'); return; }
     if (_isPinching) return;
 

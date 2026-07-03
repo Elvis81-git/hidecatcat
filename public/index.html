@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HideCatCat — 躲貓貓偽裝派對</title>
+  <meta name="description" content="結合捉迷藏與畫板偽裝的多人連線派對遊戲。用畫筆讓自己消失在背景中！" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+
+  <!-- ══ 粒子背景 ══════════════════════════════════════════ -->
+  <canvas id="bgCanvas" aria-hidden="true"></canvas>
+
+  <!-- ══ 主容器 ════════════════════════════════════════════ -->
+  <div class="app">
+
+    <!-- ── 標題 Hero ─────────────────────────────────── -->
+    <header class="hero" aria-label="遊戲標題">
+      <div class="hero__logo" aria-hidden="true">🐱</div>
+      <h1 class="hero__title">HideCatCat</h1>
+      <p class="hero__subtitle">捉迷藏 × 偽裝畫板派對遊戲</p>
+    </header>
+
+    <!-- ══ 畫面：輸入暱稱與公開大廳 ══════════════════════════ -->
+    <section id="screen-nickname" class="screen screen--active" aria-label="輸入暱稱與房間列表">
+      <div class="card card--wide">
+        <h2 class="card__title">加入遊戲</h2>
+        
+        <div class="nickname-form-row">
+          <div class="form-group nickname-group">
+            <label class="form-label" for="input-nickname">你的暱稱</label>
+            <input
+              id="input-nickname"
+              class="form-input"
+              type="text"
+              placeholder="最多 16 字..."
+              maxlength="16"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <button id="btn-create" class="btn btn--primary btn-create-inline">
+            <span class="btn__icon">✦</span> 建立房間
+          </button>
+        </div>
+
+        <div class="rooms-header" style="margin-top: 2rem;">
+          <h3 class="rooms-header__title">公開大廳</h3>
+          <span id="rooms-count" class="rooms-count">搜尋中…</span>
+        </div>
+
+        <!-- 房間卡片容器 -->
+        <div id="room-list-container" class="room-list-container" role="list" aria-label="可加入的房間">
+          <div id="rooms-empty" class="rooms-empty">
+            <span class="rooms-empty__icon">🏚️</span>
+            <p>目前沒有開放的房間</p>
+            <p class="rooms-empty__hint">成為第一個建立房間的玩家！</p>
+          </div>
+        </div>
+
+        <!-- 手動輸入 Room ID -->
+        <div class="rooms-manual">
+          <span class="rooms-manual__or">或輸入房間碼快速加入</span>
+          <div class="rooms-manual__row">
+            <input
+              id="input-room-id"
+              class="form-input form-input--code rooms-manual__input"
+              type="text" placeholder="XXXXXX" maxlength="6"
+              autocomplete="off" spellcheck="false"
+            />
+            <button id="btn-confirm-join" class="btn btn--secondary">加入</button>
+          </div>
+          <p id="join-error" class="error-msg" role="alert" aria-live="polite"></p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ══ 畫面：等待大廳 ══════════════════════════════════ -->
+    <section id="screen-lobby" class="screen" aria-label="遊戲大廳">
+      <div class="card card--wide">
+        <div class="lobby-header">
+          <div>
+            <h2 class="card__title">遊戲大廳</h2>
+            <p class="lobby-subtitle">等待所有玩家準備中…</p>
+          </div>
+          <div class="room-id-display">
+            <span class="room-id-label">房間代碼</span>
+            <button id="room-id-value" class="room-id-badge" title="點擊複製" aria-label="複製房間代碼">
+              ------
+            </button>
+            <span id="copy-hint" class="copy-hint">已複製！</span>
+          </div>
+        </div>
+
+        <!-- 房間設定 -->
+        <div id="room-settings" class="room-settings">
+          <h3 class="room-settings__title">房間設定 <span class="host-only-tag">(房長可更改)</span></h3>
+          <div class="room-settings__grid">
+            <div class="form-group">
+              <label class="form-label" for="input-hider-time">畫畫時間 (秒)</label>
+              <input id="input-hider-time" class="form-input" type="number" min="10" max="300" value="60" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="input-seeker-time">找人時間 (秒)</label>
+              <input id="input-seeker-time" class="form-input" type="number" min="30" max="600" value="120" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 玩家列表 -->
+        <div id="player-list" class="player-list" role="list" aria-label="玩家列表">
+          <!-- 動態注入 -->
+        </div>
+
+        <p class="lobby-hint">至少需要 <strong>2 位玩家</strong>，所有人準備後自動開始</p>
+
+        <div class="lobby-actions">
+          <button id="btn-ready" class="btn btn--primary btn--lg">
+            <span id="ready-icon">⚡</span>
+            <span id="ready-text">我準備好了！</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 畫面：角色分配過渡 ══════════════════════════════ -->
+    <section id="screen-role" class="screen" aria-label="角色揭曉">
+      <div class="card card--center">
+        <div id="role-emoji" class="role-emoji" aria-hidden="true">🎭</div>
+        <h2 id="role-title" class="role-title">角色揭曉</h2>
+        <p id="role-desc" class="role-desc">準備中…</p>
+        <div class="countdown-ring">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle cx="60" cy="60" r="54" class="ring-bg"/>
+            <circle id="ring-progress" cx="60" cy="60" r="54" class="ring-fg"/>
+          </svg>
+          <span id="ring-count" class="ring-number">5</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 畫面：遊戲畫面 (Canvas) ════════════════════════ -->
+    <section id="screen-game" class="screen screen--game" aria-label="遊戲畫面">
+
+      <!-- HUD 頂部 -->
+      <div class="hud hud--top">
+        <div class="hud-left">
+          <div id="hud-role-badge" class="hud-badge hud-badge--hider">躲藏方</div>
+          <div id="hud-phase-info" class="hud-phase">上色偽裝中</div>
+        </div>
+        <div class="hud-center">
+          <div id="hud-timer" class="hud-timer" aria-live="polite" aria-label="剩餘時間">
+            <span class="timer-icon">⏱</span>
+            <span id="timer-value" class="timer-value">60</span>
+            <span class="timer-unit">秒</span>
+          </div>
+        </div>
+        <div class="hud-right">
+          <div id="hud-bullets" class="hud-bullets" style="display:none">
+            <span class="bullet-icon">🎯</span>
+            <span id="bullet-value">0</span>
+          </div>
+          <div id="hud-players-alive" class="hud-alive"></div>
+        </div>
+      </div>
+
+      <!-- Canvas 容器 (縮放由 JS 控制) -->
+      <div id="canvas-viewport" class="canvas-viewport">
+        <div id="canvas-stage" class="canvas-stage">
+          <!-- 背景地圖層 -->
+          <canvas id="canvas-map"  class="canvas-layer canvas-layer--map"      aria-label="遊戲地圖"></canvas>
+          <!-- 火柴人層 (獨立層，可拖曳) -->
+          <canvas id="canvas-stickman" class="canvas-layer canvas-layer--stickman" aria-label="角色"></canvas>
+          <!-- 角色/偽裝繪製層 -->
+          <canvas id="canvas-draw" class="canvas-layer canvas-layer--draw"     aria-label="繪製層"></canvas>
+          <!-- Seeker 射擊特效層 -->
+          <canvas id="canvas-fx"   class="canvas-layer canvas-layer--fx"       aria-hidden="true"></canvas>
+        </div>
+      </div>
+
+      <!-- 縮放控制 + 拖曳地圖 -->
+      <div class="zoom-controls" aria-label="縮放與移動控制">
+        <button id="btn-pan-mode"  class="zoom-btn" aria-label="拖曳地圖" title="拖曳地圖 (Space)">🖐️</button>
+        <div class="zoom-divider"></div>
+        <button id="btn-zoom-in"   class="zoom-btn" aria-label="放大">🔍+</button>
+        <span   id="zoom-level"    class="zoom-label">100%</span>
+        <button id="btn-zoom-out"  class="zoom-btn" aria-label="縮小">🔍−</button>
+        <button id="btn-zoom-reset" class="zoom-btn" aria-label="重設縮放">↺</button>
+      </div>
+
+      <!-- Hider 工具列 (上色階段顯示) -->
+      <div id="hider-toolbar" class="hider-toolbar" style="display:none" role="toolbar" aria-label="繪製工具">
+
+        <!-- 姿勢選擇 (鎖定前顯示) -->
+        <div class="toolbar-section" id="pose-section">
+          <label class="toolbar-label">姿勢</label>
+          <div class="pose-btns" role="group" aria-label="火柴人姿勢">
+            <button class="pose-btn pose-btn--active" data-pose="0" title="站立" aria-pressed="true">🧔</button>
+            <button class="pose-btn" data-pose="1" title="蹲下" aria-pressed="false">🦴</button>
+            <button class="pose-btn" data-pose="2" title="裉手" aria-pressed="false">🙋</button>
+            <button class="pose-btn" data-pose="3" title="大字跳" aria-pressed="false">🤸</button>
+            <button class="pose-btn" data-pose="4" title="躺平" aria-pressed="false">😴</button>
+          </div>
+        </div>
+
+        <!-- 分隔線 -->
+        <div class="toolbar-divider"></div>
+
+        <!-- 工具選擇 + 復原 -->
+        <div class="toolbar-section">
+          <button id="tool-brush"   class="tool-btn tool-btn--active" data-tool="brush"   title="筆刷" aria-pressed="true">🖌️</button>
+          <button id="tool-eyedrop" class="tool-btn"                  data-tool="eyedrop" title="吸色筆" aria-pressed="false">💧</button>
+          <button id="tool-eraser"  class="tool-btn"                  data-tool="eraser"  title="橡皮擦" aria-pressed="false">🧹</button>
+          <div class="toolbar-divider"></div>
+          <button id="btn-undo"     class="tool-btn" title="復原 Ctrl+Z" aria-label="復原">↩️</button>
+        </div>
+        <!-- 筆刷大小 -->
+        <div class="toolbar-section">
+          <label class="toolbar-label" for="brush-size">大小</label>
+          <input id="brush-size" class="toolbar-slider" type="range" min="2" max="40" value="12" aria-label="筆刷大小" />
+          <span id="brush-size-value" class="toolbar-value">12</span>
+        </div>
+        <!-- 顏色選擇 -->
+        <div class="toolbar-section">
+          <label class="toolbar-label" for="color-hue">色相</label>
+          <input id="color-hue" class="toolbar-slider slider--hue" type="range" min="0" max="360" value="180" aria-label="色相" />
+        </div>
+        <div class="toolbar-section">
+          <label class="toolbar-label" for="color-sat">飽和</label>
+          <input id="color-sat" class="toolbar-slider" type="range" min="0" max="100" value="60" aria-label="飽和度" />
+        </div>
+        <div class="toolbar-section">
+          <label class="toolbar-label" for="color-lit">明度</label>
+          <input id="color-lit" class="toolbar-slider" type="range" min="0" max="100" value="50" aria-label="明度" />
+        </div>
+        <!-- 預覽色塊 -->
+        <div class="toolbar-section">
+          <div id="color-preview" class="color-preview" aria-label="目前顏色"></div>
+        </div>
+        <!-- 鎖定/提交按鈕 -->
+        <div class="toolbar-section toolbar-section--actions">
+          <button id="btn-lock-pos" class="btn btn--sm btn--warning">📍 鎖定位置</button>
+          <button id="btn-submit"   class="btn btn--sm btn--success" style="display:none">✔ 完成偽裝</button>
+        </div>
+      </div>
+
+      <!-- Seeker 提示 -->
+      <div id="seeker-hint" class="seeker-hint" style="display:none">
+        <span class="seeker-hint__icon">🔫</span>
+        點擊地圖可疑位置來開槍！
+      </div>
+
+    </section>
+
+    <!-- ══ 畫面：遊戲結果 ════════════════════════════════ -->
+    <section id="screen-result" class="screen" aria-label="遊戲結果">
+      <div class="card card--center card--result">
+        <div id="result-emoji" class="result-emoji" aria-hidden="true">🏆</div>
+        <h2 id="result-title" class="result-title">勝負揭曉</h2>
+        <p id="result-desc" class="result-desc"></p>
+        <div id="result-scoreboard" class="scoreboard" role="list" aria-label="成績榜"></div>
+        <p class="result-countdown">8 秒後自動返回大廳…</p>
+      </div>
+    </section>
+
+  </div><!-- /app -->
+
+  <!-- ══ Toast 通知 ═══════════════════════════════════════ -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- ══ Scripts ══════════════════════════════════════════ -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/client.js" type="module"></script>
+
+</body>
+</html>
